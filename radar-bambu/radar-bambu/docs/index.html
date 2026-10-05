@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Radar Bambu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#E4E8EB;--plate:#F3F5F6;--ink:#17202A;--mute:#5F6B78;--line:#C9D0D6;--ok:#008F37;--warn:#B07405;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151B22;--plate:#1E262F;--ink:#E7ECF0;--mute:#93A0AD;--line:#33404C;--ok:#3DD47A;--warn:#E6A83A}}
+*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Barlow,system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:28px 18px 60px}
+h1{font:700 2.4rem/1 "Barlow Condensed",sans-serif;margin:0}
+.sub{color:var(--mute);margin:6px 0 28px}
+.model{display:grid;grid-template-columns:1fr auto;gap:4px 16px;padding:18px 0;border-top:1px solid var(--line)}
+.model:last-of-type{border-bottom:1px solid var(--line)}
+.name{font:700 1.5rem/1.1 "Barlow Condensed",sans-serif}
+.price{font:700 2.6rem/1 "Barlow Condensed",sans-serif;text-align:right;font-variant-numeric:tabular-nums}
+.price.ok{color:var(--ok)}
+.meta{color:var(--mute);font-size:.92rem}
+.meta a{color:inherit}
+.right{text-align:right}
+.tag{font-weight:500}.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}
+section{margin-top:40px}
+h2{font:700 1.4rem "Barlow Condensed",sans-serif;margin:0 0 12px}
+.plate{background:var(--plate);border-radius:10px;padding:14px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:500}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+a:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
+.empty{color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Radar Bambu</h1>
+  <p class="sub" id="sub">Carregando…</p>
+  <div id="models"></div>
+  <section><h2>Menor custo por dia</h2><div class="plate"><canvas id="chart" height="240"></canvas></div></section>
+  <section><h2>Todas as ofertas válidas</h2><div class="scroll"><table id="tbl"></table></div></section>
+</main>
+<script>
+const R=v=>v==null?"—":"R$ "+Math.round(v).toLocaleString("pt-BR");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const COLORS=["#008F37","#1F6FB2","#B07405","#8A3FB0","#C2410C","#0E7C86"];
+fetch("data.json?"+Date.now()).then(r=>r.json()).then(d=>{
+  document.getElementById("sub").textContent=
+    `Custo efetivo até Palmas · atualizado ${new Date(d.atualizado).toLocaleString("pt-BR")} · dólar ${d.usd_brl.toFixed(2)}`;
+  const box=document.getElementById("models");
+  Object.entries(d.modelos).forEach(([k,m])=>{
+    const o=d.agora[k], best=d.melhor_historico[k], py=(d.agora_py||{})[k];
+    const below=o&&m.alvo&&o.custo<=m.alvo;
+    let tag="";
+    if(o&&m.alvo){const diff=o.custo-m.alvo;tag=`<span class="tag ${below?"ok":"warn"}">${below?"abaixo":"acima"} do alvo em ${R(Math.abs(diff))}</span>`}
+    else if(!m.alvo) tag=`<span class="tag">sem alvo definido</span>`;
+    box.insertAdjacentHTML("beforeend",`<div class="model">
+      <div class="name">${esc(m.nome)}</div>
+      <div class="price ${below?"ok":""}">${o?R(o.custo):"—"}</div>
+      <div class="meta">${o?`<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.fonte)}</a> · ${esc(o.titulo).slice(0,70)}`:"Nenhuma oferta válida nesta leitura"}</div>
+      <div class="meta right">${tag}${best?`<br>mínimo BR já visto ${R(best.custo)}`:""}</div>
+      ${py?`<div class="meta" style="grid-column:1/-1">Opção Paraguai (sem garantia BR): ${R(py.custo)}${o?` · ${Math.round(100*(1-py.custo/o.custo))}% ${py.custo<o.custo?"abaixo":"acima"} do BR`:""} · <a href="${esc(py.url)}" target="_blank" rel="noopener">${esc(py.fonte)}</a></div>`:""}</div>`);
+  });
+  const days=[...new Set(Object.values(d.serie).flat().map(p=>p[0]))].sort();
+  new Chart(document.getElementById("chart"),{type:"line",
+    data:{labels:days.map(x=>x.slice(5).split("-").reverse().join("/")),
+      datasets:Object.entries(d.serie).map(([k,pts],i)=>{const m=Object.fromEntries(pts);
+        return{label:d.modelos[k]?.nome||k,data:days.map(x=>m[x]??null),spanGaps:true,
+          borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length],tension:.2,pointRadius:2}})},
+    options:{responsive:true,interaction:{mode:"index",intersect:false},
+      scales:{y:{ticks:{callback:v=>R(v)}}},plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${R(c.parsed.y)}`}}}}});
+  const t=document.getElementById("tbl");
+  t.innerHTML=d.ofertas.length?`<tr><th>Modelo</th><th>Canal</th><th>Loja</th><th>Anúncio</th><th class="right">Preço</th><th class="right">Efetivo</th></tr>`+
+    d.ofertas.map(o=>`<tr><td>${esc(d.modelos[o.modelo]?.nome||o.modelo)}</td><td>${o.canal==="py"?"Paraguai":"Brasil"}</td><td>${esc(o.fonte)}</td>
+      <td><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.titulo).slice(0,80)}</a></td>
+      <td class="n">${o.moeda==="USD"?"US$ "+o.preco.toLocaleString("pt-BR"):R(o.preco)}</td><td class="n">${R(o.custo)}</td></tr>`).join("")
+    :`<tr><td class="empty">Nenhuma oferta ainda. Rode o workflow em Actions → radar → Run workflow.</td></tr>`;
+}).catch(()=>{document.getElementById("sub").textContent="data.json não encontrado. Rode o workflow uma vez para gerar os dados."});
+</script>
+</body>
+</html>

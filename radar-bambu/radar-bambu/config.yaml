@@ -1,0 +1,57 @@
+# Radar Bambu — configuração
+# Custo efetivo = o que sai do seu bolso até a máquina chegar em Palmas.
+
+modelos:
+  # todos: regex que TODAS precisam bater no título | nenhum: regex que NÃO pode aparecer
+  # piso: descarta anúncio abaixo disso (peça/acessório disfarçado) | alvo: alerta quando custo efetivo <= alvo
+  a1:
+    nome: "A1 (sem AMS)"
+    todos: ['\ba1\b']
+    nenhum: ['combo', '\bams\b', 'lite', 'mini', 'kit']
+    piso: 1200
+    alvo: null          # defina quando tiver um número
+
+# Título com qualquer um destes termos é descartado (peças, usados, acessórios)
+excluir_global:
+  - 'pe[çc]a|reposi[çc]'
+  - 'hotend|bico|nozzle|extrusora|extruder|cutter|wiper|ventoinha|\bfan\b|correia|belt'
+  - '\bplaca\b|\bplate\b|filamento|bobina|sensor|motor|cabo|capa|suporte|tampa|cover'
+  - 'usad[ao]|seminov|recondicion|defeit|vitrine|open ?box|retirada de pe'
+  - 'compat[ií]vel'
+
+alertas:
+  queda_pct: 5            # alerta se a mesma oferta cair X% desde a última leitura
+  novo_minimo: true       # alerta quando um modelo bate o menor custo já visto
+  cooldown_horas: 24      # não repete o mesmo alerta da mesma oferta antes disso
+
+cambio:
+  fallback_usd_brl: 5.40  # usado só se a API de câmbio falhar
+  spread: 0.04            # câmbio real que você paga acima do comercial (4% = casa de câmbio/cartão/contato)
+
+fontes:
+  mercado_livre:
+    ativo: true
+    buscas: ["bambu lab a1", "impressora 3d bambu lab a1"]
+    frete_padrao_brl: 0   # somado quando o anúncio não tem frete grátis (ajuste p/ Palmas)
+
+  # Páginas específicas de produto (lojas BR ou Paraguai). O preço sai do JSON-LD/meta da página.
+  # moeda: BRL ou USD | modelo: força a classificação (opcional) | frete_brl: custo até Palmas
+  # paraguai: true aplica o modelo de custo de importação abaixo
+  paginas:
+    # - nome: "KaBuM"
+    #   url: "https://www.kabum.com.br/produto/..."
+    #   moeda: BRL
+    # - nome: "Loja CDE (Paraguai)"
+    #   url: "https://..."
+    #   moeda: USD
+    #   paraguai: true
+    #   modelo: h2s
+
+paraguai:
+  # Paraguai é OPÇÃO, não fonte: não entra em 'melhor preço', nem em mínimo histórico.
+  # Só gera alerta se ficar X% abaixo do melhor preço BR do mesmo modelo (null = nunca alerta).
+  alerta_se_economia_pct: 25
+  frete_fixo_brl: 0       # o que o contato/transporte cobra até Palmas
+  taxa_contato_pct: 0     # comissão do contato sobre o valor em USD
+  cota_usd: 500           # cota de isenção (via terrestre)
+  imposto_excesso: 0.50   # alíquota sobre o que passar da cota
